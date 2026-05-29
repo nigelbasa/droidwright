@@ -16,7 +16,6 @@ config.resolver.blockList = [
 
 config.resolver.nodeModulesPaths = [
   path.resolve(__dirname, './node_modules'),
-  path.resolve(__dirname, '../node_modules'),
 ];
 
 config.resolver.extraNodeModules = {
