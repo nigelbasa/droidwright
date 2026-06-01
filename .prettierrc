@@ -5,4 +5,5 @@
   "bracketSameLine": true,
   "trailingComma": "es5",
   "jsxSingleQuote": false,
+  "endOfLine": "auto",
 }

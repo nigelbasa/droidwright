@@ -7,11 +7,16 @@ import {
   DroidwrightTextLocatorOptions,
 } from './Droidwright.types';
 import NativeDroidwright from './DroidwrightModule';
+import {
+  normalizeScript,
+  parseAndroidEvaluationResult,
+  serializeActionOptions,
+  serializeCookie,
+  timeout,
+} from './serialize';
 
 export { NativeDroidwright };
 export * from './Droidwright.types';
-
-const DEFAULT_TIMEOUT_MS = 10_000;
 
 type PageFunction<T> = () => T;
 
@@ -269,64 +274,6 @@ export class DroidwrightStorage {
       return out;
     })()`);
   }
-}
-
-function normalizeScript<T>(script: string | PageFunction<T>) {
-  if (typeof script === 'function') {
-    return `(${script.toString()})()`;
-  }
-  return script;
-}
-
-function parseAndroidEvaluationResult(raw: string | null) {
-  if (raw == null || raw === 'null' || raw === 'undefined') {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
-function timeout(options: DroidwrightActionOptions) {
-  return options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-}
-
-function serializeCookie(cookie: string | DroidwrightCookie) {
-  if (typeof cookie === 'string') {
-    return cookie;
-  }
-
-  return `${cookie.name}=${cookie.value}`;
-}
-
-function serializeActionOptions(options: DroidwrightActionOptions) {
-  const humanPace =
-    typeof options.humanPace === 'object'
-      ? {
-          enabled: options.humanPace.enabled ?? true,
-          movementSteps: options.humanPace.movementSteps ?? 5,
-          minDelayMs: options.humanPace.minDelayMs ?? 80,
-          maxDelayMs: options.humanPace.maxDelayMs ?? 220,
-          postActionDelayMs: options.humanPace.postActionDelayMs ?? 160,
-        }
-      : {
-          enabled: options.humanPace ?? false,
-          movementSteps: 5,
-          minDelayMs: 80,
-          maxDelayMs: 220,
-          postActionDelayMs: 160,
-        };
-
-  return JSON.stringify({
-    visible: options.visible ?? true,
-    enabled: options.enabled ?? true,
-    stable: options.stable ?? true,
-    force: options.force ?? false,
-    humanPace,
-  });
 }
 
 export type DroidwrightApi = {
