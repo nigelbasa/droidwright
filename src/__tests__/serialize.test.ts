@@ -40,6 +40,26 @@ describe('normalizeScript', () => {
     // eslint-disable-next-line no-eval
     expect(eval(normalized)).toBe(2);
   });
+
+  it('applies JSON-serialized arguments to a function', () => {
+    const normalized = normalizeScript((a: number, b: number) => a + b, [2, 3]);
+    expect(normalized).toContain('2, 3');
+    // eslint-disable-next-line no-eval
+    expect(eval(normalized)).toBe(5);
+  });
+
+  it('serializes string and object arguments safely', () => {
+    const normalized = normalizeScript(
+      (s: string, o: { k: number }) => `${s}:${o.k}`,
+      ['x', { k: 7 }]
+    );
+    // eslint-disable-next-line no-eval
+    expect(eval(normalized)).toBe('x:7');
+  });
+
+  it('ignores arguments for raw string scripts', () => {
+    expect(normalizeScript('1 + 1', [42])).toBe('1 + 1');
+  });
 });
 
 describe('parseAndroidEvaluationResult', () => {

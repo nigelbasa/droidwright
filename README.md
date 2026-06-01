@@ -63,7 +63,9 @@ const page = await launch(options);
 
 await page.goto(url, { timeoutMs: 10000 });
 await page.evaluate(() => document.body.innerText);
+await page.evaluate((selector, attr) => document.querySelector(selector)?.getAttribute(attr), '.next a', 'href');
 await page.waitForSelector('.result');
+await page.waitForFunction(() => document.readyState === 'complete', { timeoutMs: 5000 });
 await page.click('button');
 await page.tap('button', { visible: true, enabled: true, stable: true });
 await page.fill('input[name="q"]', 'Expo');
@@ -133,6 +135,37 @@ ERR_DROIDWRIGHT_NOT_ENABLED
 ERR_DROIDWRIGHT_NOT_STABLE
 ERR_DROIDWRIGHT_ELEMENT_COVERED
 ERR_DROIDWRIGHT_TIMEOUT
+```
+
+These are exported as the `DroidwrightErrorCode` constant, and thrown errors carry a `.code`:
+
+```ts
+import { DroidwrightErrorCode, getDroidwrightErrorCode } from 'droidwright';
+
+try {
+  await page.click('#submit', { timeoutMs: 2000 });
+} catch (error) {
+  if (getDroidwrightErrorCode(error) === DroidwrightErrorCode.ElementCovered) {
+    await page.click('#submit', { force: true });
+  }
+}
+```
+
+## Evaluating with arguments
+
+`page.evaluate` does not capture closure variables — pass data explicitly as
+JSON-serializable arguments:
+
+```ts
+const href = await page.evaluate(
+  (selector: string) => document.querySelector(selector)?.getAttribute('href'),
+  '.next a'
+);
+
+// Poll the page until a condition holds (throws ERR_DROIDWRIGHT_TIMEOUT).
+await page.waitForFunction(() => document.querySelectorAll('.product_pod').length > 0, {
+  timeoutMs: 10000,
+});
 ```
 
 ## Launch options

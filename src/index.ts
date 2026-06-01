@@ -7,6 +7,7 @@ import {
   DroidwrightTextLocatorOptions,
 } from './Droidwright.types';
 import NativeDroidwright from './DroidwrightModule';
+import { DroidwrightError, DroidwrightErrorCode } from './errors';
 import {
   normalizeScript,
   parseAndroidEvaluationResult,
@@ -17,8 +18,7 @@ import {
 
 export { NativeDroidwright };
 export * from './Droidwright.types';
-
-type PageFunction<T> = () => T;
+export * from './errors';
 
 export async function launch(options: DroidwrightLaunchOptions = {}) {
   const session = await NativeDroidwright.createSession(JSON.stringify(options));
@@ -56,9 +56,31 @@ export class DroidwrightPage {
     return NativeDroidwright.goBack(this.sessionId, timeout(options));
   }
 
-  async evaluate<T = unknown>(script: string | PageFunction<T>): Promise<T> {
-    const raw = await NativeDroidwright.evaluate(this.sessionId, normalizeScript(script));
+  async evaluate<T = unknown, A extends unknown[] = []>(
+    script: string | ((...args: A) => T),
+    ...args: A
+  ): Promise<T> {
+    const raw = await NativeDroidwright.evaluate(this.sessionId, normalizeScript(script, args));
     return parseAndroidEvaluationResult(raw) as T;
+  }
+
+  async waitForFunction<T = unknown>(
+    script: string | (() => T),
+    options: DroidwrightActionOptions = {}
+  ): Promise<T> {
+    const timeoutMs = timeout(options);
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      const result = await this.evaluate<T>(script);
+      if (result) {
+        return result;
+      }
+      await delay(WAIT_FUNCTION_POLL_MS);
+    }
+    throw new DroidwrightError(
+      DroidwrightErrorCode.Timeout,
+      `Timed out after ${timeoutMs}ms waiting for function to return a truthy value.`
+    );
   }
 
   async waitForSelector(selector: string, options: DroidwrightActionOptions = {}) {
@@ -293,3 +315,11 @@ const Droidwright: DroidwrightApi = {
 };
 
 export default Droidwright;
+
+const WAIT_FUNCTION_POLL_MS = 100;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}

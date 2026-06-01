@@ -2,11 +2,20 @@ import { DroidwrightActionOptions, DroidwrightCookie } from './Droidwright.types
 
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-type ScriptFunction = () => unknown;
+type ScriptFunction = (...args: any[]) => unknown;
 
-export function normalizeScript(script: string | ScriptFunction): string {
+/**
+ * Turns a page function or raw script into a string for the native WebView.
+ *
+ * Function arguments are JSON-serialized and applied, so `evaluate` can pass
+ * data into the page (closure variables are NOT captured — only the passed
+ * args are available). Raw string scripts are returned unchanged; any args are
+ * ignored for them.
+ */
+export function normalizeScript(script: string | ScriptFunction, args: unknown[] = []): string {
   if (typeof script === 'function') {
-    return `(${script.toString()})()`;
+    const serializedArgs = args.map((arg) => JSON.stringify(arg) ?? 'undefined').join(', ');
+    return `(${script.toString()})(${serializedArgs})`;
   }
   return script;
 }
