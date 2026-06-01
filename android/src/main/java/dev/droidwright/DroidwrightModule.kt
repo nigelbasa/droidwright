@@ -922,8 +922,7 @@ class DroidwrightModule : Module() {
               var style = window.getComputedStyle(element);
               var hasBox = rect.width > 0 && rect.height > 0;
               var styleVisible = style.visibility !== "hidden" && style.display !== "none" && Number(style.opacity || "1") > 0;
-              var intersectsViewport = rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
-              if (!hasBox || !styleVisible || !intersectsViewport) {
+              if (!hasBox || !styleVisible) {
                 return {
                   ok: false,
                   code: "ERR_DROIDWRIGHT_NOT_VISIBLE",
@@ -945,10 +944,23 @@ class DroidwrightModule : Module() {
               }
             }
 
+            // Scroll into view BEFORE the viewport-intersection and covered
+            // checks. Otherwise a below-the-fold element that is perfectly
+            // actionable after scrolling is wrongly rejected as not visible.
+            element.scrollIntoView({ block: "center", inline: "center" });
+            rect = element.getBoundingClientRect();
+            rectPayload = window.__droidwrightRectPayload(rect);
+
             if (options.visible) {
-              element.scrollIntoView({ block: "center", inline: "center" });
-              rect = element.getBoundingClientRect();
-              rectPayload = window.__droidwrightRectPayload(rect);
+              var intersectsViewport = rect.bottom > 0 && rect.right > 0 && rect.top < window.innerHeight && rect.left < window.innerWidth;
+              if (!intersectsViewport) {
+                return {
+                  ok: false,
+                  code: "ERR_DROIDWRIGHT_NOT_VISIBLE",
+                  error: "Element for " + label + " is not visible.",
+                  rect: rectPayload
+                };
+              }
             }
 
             var centerX = rect.left + rect.width / 2;
