@@ -13,11 +13,23 @@
     "open:ios": "node internal/module_scripts/open-ios.js",
     "open:android": "node internal/module_scripts/open-android.js"
   },
+  "files": [
+    "build",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "expo-module.config.json",
+    "CHANGELOG.md"
+  ],
   "keywords": [
     "react-native",
     "expo",
-    "droidwright",
-    "Droidwright"
+    "android",
+    "webview",
+    "automation",
+    "playwright",
+    "scraping",
+    "droidwright"
   ],
   "repository": "https://github.com/nigelbasa/droidwright",
   "bugs": {
