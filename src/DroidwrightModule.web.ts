@@ -90,6 +90,22 @@ class DroidwrightModule extends NativeModule<DroidwrightModuleEvents> {
   snapshot(): Promise<never> {
     return Promise.reject(createUnsupportedError());
   }
+
+  screenshot(): Promise<never> {
+    return Promise.reject(createUnsupportedError());
+  }
+
+  hover(): Promise<never> {
+    return Promise.reject(createUnsupportedError());
+  }
+
+  press(): Promise<never> {
+    return Promise.reject(createUnsupportedError());
+  }
+
+  selectOption(): Promise<never> {
+    return Promise.reject(createUnsupportedError());
+  }
 }
 
 function createUnsupportedError() {

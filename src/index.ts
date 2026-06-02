@@ -195,6 +195,34 @@ export class DroidwrightPage {
     return NativeDroidwright.snapshot(this.sessionId);
   }
 
+  /** Captures the offscreen WebView as a base64-encoded PNG string. */
+  async screenshot(): Promise<string> {
+    return NativeDroidwright.screenshot(this.sessionId);
+  }
+
+  async hover(selector: string, options: DroidwrightActionOptions = {}) {
+    await NativeDroidwright.hover(
+      this.sessionId,
+      selector,
+      timeout(options),
+      serializeActionOptions(options)
+    );
+  }
+
+  async press(selector: string, key: string, options: DroidwrightActionOptions = {}) {
+    await NativeDroidwright.press(
+      this.sessionId,
+      selector,
+      key,
+      timeout(options),
+      serializeActionOptions(options)
+    );
+  }
+
+  async selectOption(selector: string, value: string, options: DroidwrightActionOptions = {}) {
+    await NativeDroidwright.selectOption(this.sessionId, selector, value, timeout(options));
+  }
+
   async close() {
     await NativeDroidwright.closeSession(this.sessionId);
   }
@@ -228,6 +256,18 @@ export class DroidwrightLocator {
 
   async scrollIntoView(options: DroidwrightActionOptions = {}) {
     return this.page.scrollIntoView(this.selector, options);
+  }
+
+  async hover(options: DroidwrightActionOptions = {}) {
+    return this.page.hover(this.selector, options);
+  }
+
+  async press(key: string, options: DroidwrightActionOptions = {}) {
+    return this.page.press(this.selector, key, options);
+  }
+
+  async selectOption(value: string, options: DroidwrightActionOptions = {}) {
+    return this.page.selectOption(this.selector, value, options);
   }
 }
 

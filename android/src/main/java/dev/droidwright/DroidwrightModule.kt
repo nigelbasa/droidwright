@@ -3,8 +3,10 @@ package dev.droidwright
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.view.View
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
@@ -27,6 +29,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -166,6 +169,34 @@ class DroidwrightModule : Module() {
       }
     }
 
+    AsyncFunction("screenshot") Coroutine { sessionId: String ->
+      screenshot(sessionId)
+    }
+
+    AsyncFunction("hover") Coroutine { sessionId: String, selector: String, timeoutMs: Int, actionOptionsJson: String ->
+      val actionOptions = parseActionOptions(actionOptionsJson)
+      waitForActionableSelector(sessionId, selector, actionOptions, timeoutMs)
+      val session = requireSession(sessionId)
+      runHumanPaceBeforeAction(actionOptions)
+      requireActionOk("hover", evaluateRaw(session, hoverScript(selector)))
+      runHumanPaceAfterAction(actionOptions)
+    }
+
+    AsyncFunction("press") Coroutine { sessionId: String, selector: String, key: String, timeoutMs: Int, actionOptionsJson: String ->
+      val actionOptions = parseActionOptions(actionOptionsJson)
+      waitForActionableSelector(sessionId, selector, actionOptions, timeoutMs)
+      val session = requireSession(sessionId)
+      runHumanPaceBeforeAction(actionOptions)
+      requireActionOk("press", evaluateRaw(session, pressScript(selector, key)))
+      runHumanPaceAfterAction(actionOptions)
+    }
+
+    AsyncFunction("selectOption") Coroutine { sessionId: String, selector: String, value: String, timeoutMs: Int ->
+      waitForSelector(sessionId, selector, timeoutMs)
+      val session = requireSession(sessionId)
+      requireActionOk("selectOption", evaluateRaw(session, selectOptionScript(selector, value)))
+    }
+
     OnDestroy {
       destroyAllSessionsOnMain()
     }
@@ -193,6 +224,12 @@ class DroidwrightModule : Module() {
       mediaPlaybackRequiresUserGesture = false
       options.userAgent?.let { userAgentString = it }
     }
+    // A hardware-accelerated WebView draws blank to a software Canvas, which is
+    // the only capture path available for an offscreen (never window-attached)
+    // view. Use a software layer for the session's lifetime so screenshot() can
+    // render real pixels.
+    webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
     webView.measure(
       View.MeasureSpec.makeMeasureSpec(options.viewportWidth, View.MeasureSpec.EXACTLY),
       View.MeasureSpec.makeMeasureSpec(options.viewportHeight, View.MeasureSpec.EXACTLY)
@@ -510,6 +547,28 @@ class DroidwrightModule : Module() {
           continuation.resume(mapOf("removed" to removed))
         }
       }
+    }
+  }
+
+  private suspend fun screenshot(sessionId: String): String = withContext(Dispatchers.Main) {
+    val session = requireSession(sessionId)
+    val webView = session.webView
+    val width = webView.width
+    val height = webView.height
+    if (width <= 0 || height <= 0) {
+      throw DroidwrightException(
+        "ERR_DROIDWRIGHT_SCREENSHOT",
+        "The WebView has no laid-out size to capture yet."
+      )
+    }
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    try {
+      webView.draw(Canvas(bitmap))
+      val stream = ByteArrayOutputStream()
+      bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+      Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+    } finally {
+      bitmap.recycle()
     }
   }
 
@@ -859,6 +918,91 @@ class DroidwrightModule : Module() {
           }
           element.scrollIntoView({ block: "center", inline: "center" });
           return JSON.stringify({ ok: true, scrollX: window.scrollX, scrollY: window.scrollY });
+        } catch (error) {
+          return JSON.stringify({ ok: false, error: error.message });
+        }
+      })()
+    """.trimIndent()
+  }
+
+  private fun hoverScript(selector: String): String {
+    return """
+      (function() {
+        try {
+          var element = document.querySelector(${quote(selector)});
+          if (!element) {
+            return JSON.stringify({ ok: false, error: "No element matches selector ${escapeForMessage(selector)}." });
+          }
+          element.scrollIntoView({ block: "center", inline: "center" });
+          var rect = element.getBoundingClientRect();
+          var x = rect.left + rect.width / 2;
+          var y = rect.top + rect.height / 2;
+          var target = document.elementFromPoint(x, y) || element;
+          var base = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y };
+          target.dispatchEvent(new MouseEvent("mouseenter", base));
+          target.dispatchEvent(new MouseEvent("mouseover", base));
+          target.dispatchEvent(new MouseEvent("mousemove", base));
+          if (typeof PointerEvent === "function") {
+            target.dispatchEvent(new PointerEvent("pointerenter", Object.assign({}, base, { pointerType: "mouse", isPrimary: true })));
+            target.dispatchEvent(new PointerEvent("pointerover", Object.assign({}, base, { pointerType: "mouse", isPrimary: true })));
+            target.dispatchEvent(new PointerEvent("pointermove", Object.assign({}, base, { pointerType: "mouse", isPrimary: true })));
+          }
+          return JSON.stringify({ ok: true });
+        } catch (error) {
+          return JSON.stringify({ ok: false, error: error.message });
+        }
+      })()
+    """.trimIndent()
+  }
+
+  private fun pressScript(selector: String, key: String): String {
+    return """
+      (function() {
+        try {
+          var element = document.querySelector(${quote(selector)});
+          if (!element) {
+            return JSON.stringify({ ok: false, error: "No element matches selector ${escapeForMessage(selector)}." });
+          }
+          element.focus();
+          var keyValue = ${quote(key)};
+          var base = { key: keyValue, code: keyValue, bubbles: true, cancelable: true, composed: true };
+          element.dispatchEvent(new KeyboardEvent("keydown", base));
+          element.dispatchEvent(new KeyboardEvent("keypress", base));
+          element.dispatchEvent(new KeyboardEvent("keyup", base));
+          return JSON.stringify({ ok: true });
+        } catch (error) {
+          return JSON.stringify({ ok: false, error: error.message });
+        }
+      })()
+    """.trimIndent()
+  }
+
+  private fun selectOptionScript(selector: String, value: String): String {
+    return """
+      (function() {
+        try {
+          var element = document.querySelector(${quote(selector)});
+          if (!element) {
+            return JSON.stringify({ ok: false, error: "No element matches selector ${escapeForMessage(selector)}." });
+          }
+          if (element.tagName !== "SELECT") {
+            return JSON.stringify({ ok: false, error: "Element is not a <select>." });
+          }
+          var targetValue = ${quote(value)};
+          var found = false;
+          for (var i = 0; i < element.options.length; i++) {
+            if (element.options[i].value === targetValue || element.options[i].text === targetValue) {
+              element.options[i].selected = true;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            return JSON.stringify({ ok: false, error: "No option matches value or text " + JSON.stringify(targetValue) + "." });
+          }
+          element.dispatchEvent(new Event("input", { bubbles: true }));
+          element.dispatchEvent(new Event("change", { bubbles: true }));
+          return JSON.stringify({ ok: true });
         } catch (error) {
           return JSON.stringify({ ok: false, error: error.message });
         }

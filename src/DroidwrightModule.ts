@@ -73,6 +73,26 @@ declare class DroidwrightModule extends NativeModule<DroidwrightModuleEvents> {
   setCookie(url: string, cookie: string): Promise<DroidwrightCookieResult>;
   clearCookies(): Promise<DroidwrightCookieResult>;
   snapshot(sessionId: string): Promise<DroidwrightNavigationResult>;
+  screenshot(sessionId: string): Promise<string>;
+  hover(
+    sessionId: string,
+    selector: string,
+    timeoutMs: number,
+    actionOptionsJson: string
+  ): Promise<Record<string, unknown>>;
+  press(
+    sessionId: string,
+    selector: string,
+    key: string,
+    timeoutMs: number,
+    actionOptionsJson: string
+  ): Promise<Record<string, unknown>>;
+  selectOption(
+    sessionId: string,
+    selector: string,
+    value: string,
+    timeoutMs: number
+  ): Promise<Record<string, unknown>>;
 }
 
 export default requireNativeModule<DroidwrightModule>('Droidwright');

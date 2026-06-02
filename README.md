@@ -71,8 +71,12 @@ await page.tap('button', { visible: true, enabled: true, stable: true });
 await page.fill('input[name="q"]', 'Expo');
 await page.textContent('.result');
 await page.getByText('Next').click();
+await page.hover('a.link');
+await page.press('input', 'Enter');
+await page.selectOption('select#country', 'us');
 await page.scrollBy(0, 600);
 await page.scrollIntoView('.footer');
+const png = await page.screenshot(); // base64-encoded PNG
 await page.localStorage.setItem('seen', 'true');
 await page.sessionStorage.snapshot();
 await page.getCookies();
